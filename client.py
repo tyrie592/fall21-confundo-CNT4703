@@ -15,24 +15,18 @@ args = parser.parse_args()
 
 def start():
     try:
-        with confundo.Socket() as s:
+        with confundo.Socket() as sock:
             sock.settimeout(10)
-            sock.connect((host, port))
+            sock.connect((args.host, int(args.port)))
 
-            response = b''
-            while response[-2:] != b'\r\n':
-                got = sock.recv(1)
-                response += got
-
-            if response == b'accio\r\n':
-                with open(filename, "rb") as f:
-                    data = f.read(1024)
-                    while data:
-                        total_sent = 0
-                        while total_sent < len(data):
-                            sent = sock.send(data[total_sent:])
-                            total_sent += sent
-                            data = f.read(1024)
+            with open(args.file, "rb") as f:
+                data = f.read(1024)
+                while data:
+                    total_sent = 0
+                    while total_sent < len(data):
+                        sent = sock.send(data[total_sent:])
+                        total_sent += sent
+                        data = f.read(1024)
     except RuntimeError as e:
         sys.stderr.write(f"ERROR: {e}\n")
         sys.exit(1)
