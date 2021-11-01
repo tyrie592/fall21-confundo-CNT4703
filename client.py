@@ -20,13 +20,13 @@ def start():
             sock.connect((args.host, int(args.port)))
 
             with open(args.file, "rb") as f:
-                data = f.read(1024)
+                data = f.read(50000)
                 while data:
                     total_sent = 0
                     while total_sent < len(data):
                         sent = sock.send(data[total_sent:])
                         total_sent += sent
-                        data = f.read(1024)
+                        data = f.read(50000)
     except RuntimeError as e:
         sys.stderr.write(f"ERROR: {e}\n")
         sys.exit(1)
