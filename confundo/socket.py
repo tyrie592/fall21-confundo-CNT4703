@@ -85,11 +85,16 @@ class Socket:
         if self.state != State.LISTEN:
             raise RuntimeError("Cannot accept")
 
+        hadNewConnId = True
         while True:
             # just wait forever until a new connection arrives
+
+            if hadNewConnId:
+                self.connId += 1 # use it for counting incoming connections, no other uses really
+                hadNewConnId = False
             pkt = self._recv()
             if pkt and pkt.isSyn:
-                self.connId += 1 # use it for counting incoming connections, no other uses really
+                hadNewConnId = True
                 ### UPDATE CORRECTLY HERE
                 clientSock = Socket(connId = self.connId, synReceived=True, sock=self.sock, inSeq=????, noClose=True)
                 # at this point, syn was received, ack for syn was sent, now need to send our SYN and wait for ACK
