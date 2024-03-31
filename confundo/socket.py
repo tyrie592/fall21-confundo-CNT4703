@@ -256,9 +256,13 @@ class Socket:
         congestion control operations.  You would need to update things here and in `format_msg` calls
         in this file to properly print values.
         '''
-
         if self.state != State.OPEN:
-            raise RuntimeError("Trying to send FIN, but socket is not in OPEN state")
+            raise RuntimeError("Trying to send data, but socket is not in OPEN state")
+
+        toSend = self.outBuffer[:MTU]
+        pkt = Packet(seqNum=self.seqNum, connid=self.connid, payload=toSend)
+        self._send(pkt)
+    
 
         self.outBuffer += data
 
