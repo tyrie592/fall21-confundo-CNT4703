@@ -248,47 +248,43 @@ class Socket:
             return response
 
     def send(self, data):
-        '''
-        This is one of the methods that require fixes.  Besides the marked place where you need
-        to figure out proper updates (to make basic transfer work), this method is the place
-        where you should initate congestion control operations.   You can either directly update cwnd, ssthresh,
-        and anything else you need or use CwndControl class, up to you.  There isn't any skeleton code for the
-        congestion control operations.  You would need to update things here and in `format_msg` calls
-        in this file to properly print values.
-        '''
-        if self.state != State.OPEN:
-            raise RuntimeError("Trying to send data, but socket is not in OPEN state")
+        def send(self, data):
+    if self.state != State.OPEN:
+        raise RuntimeError("Trying to send data, but socket is not in OPEN state")
 
-        toSend = self.outBuffer[:MTU]
-        pkt = Packet(seqNum=self.seqNum, connid=self.connid, payload=toSend)
-        self._send(pkt)
-    
+    toSend = self.outBuffer[:MTU]
+    pkt = Packet(seqNum=self.seqNum, connid=self.connid, payload=toSend)
+    self._send(pkt)
 
-        self.outBuffer += data
+    startTime = time.time()
+    while len(self.outBuffer) > 0:
+        pkt = self._recv()
+        if pkt and pkt.isAck:
+            # Congestion control logic
+            if self.cwnd < self.ssthresh:
+                self.cwnd *= 2  # Slow start
+            else:
+                self.cwnd += 1  # Congestion avoidance
 
-        startTime = time.time()
-        while len(self.outBuffer) > 0:
-            toSend = self.outBuffer[:MTU]
-            pkt = Packet(seqNum=self.base, connId=self.connId, payload=toSend)
-            ### UPDATE CORRECTLY HERE
-            ### self.seqNum = ???
-            self._send(pkt)
+            advanceAmount = len(toSend)
+            self.nDupAcks = 0
 
-            pkt = self._recv()  # if within RTO we didn't receive packets, things will be retransmitted
-            if pkt and pkt.isAck:
-                ### UPDATE CORRECTLY HERE
-                # advanceAmount = ???
-                if advanceAmount == 0:
-                    self.nDupAcks += 1
-                else:
-                    self.nDupAcks = 0
+            self.outBuffer = self.outBuffer[advanceAmount:]
+            self.base = self.seqNum  # Update base for the next sequence number
 
+        elif pkt and pkt.isDupAck:
+            self.nDupAcks += 1
+            if self.nDupAcks == self.dupAckThreshold:
+                # Fast retransmit
+                self.ssthresh = max(self.cwnd / 2, 2)
+                self.cwnd = self.ssthresh + 3
+                advanceAmount = len(toSend) * 3  # Fast retransmit, so advance by 3 segments
+                self.nDupAcks = 0
                 self.outBuffer = self.outBuffer[advanceAmount:]
-                ### UPDATE CORRECTLY HERE
-                ### self.base = ???
+                self.base = self.seqNum  # Update base for the next sequence number
 
-            if time.time() - startTime > GLOBAL_TIMEOUT:
-                self.state = State.ERROR
-                raise RuntimeError("timeout")
+        if time.time() - startTime > GLOBAL_TIMEOUT:
+            self.state = State.ERROR
+            raise RuntimeError("Timeout")
 
-        return len(data)
+    return len(data)
