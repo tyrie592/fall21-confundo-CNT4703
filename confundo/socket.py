@@ -50,6 +50,10 @@ class Socket:
         self.remote = None
         self.noClose = noClose
 
+        self.cwnd = 1  # congestion window starting size
+        self.ssthresh = 64  # Initial slow start threshold
+        self.dupAckThreshold = 3  # Duplicate ACKs fast retransmit threshold
+
     def __enter__(self):
         return self
 
