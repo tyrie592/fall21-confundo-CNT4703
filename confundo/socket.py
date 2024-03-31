@@ -248,43 +248,42 @@ class Socket:
             return response
 
     def send(self, data):
-        def send(self, data):
-    if self.state != State.OPEN:
-        raise RuntimeError("Trying to send data, but socket is not in OPEN state")
-
-    toSend = self.outBuffer[:MTU]
-    pkt = Packet(seqNum=self.seqNum, connid=self.connid, payload=toSend)
-    self._send(pkt)
-
-    startTime = time.time()
-    while len(self.outBuffer) > 0:
-        pkt = self._recv()
-        if pkt and pkt.isAck:
-            # Congestion control logic
-            if self.cwnd < self.ssthresh:
-                self.cwnd *= 2  # Slow start
-            else:
-                self.cwnd += 1  # Congestion avoidance
-
-            advanceAmount = len(toSend)
-            self.nDupAcks = 0
-
-            self.outBuffer = self.outBuffer[advanceAmount:]
-            self.base = self.seqNum  # Update base for the next sequence number
-
-        elif pkt and pkt.isDupAck:
-            self.nDupAcks += 1
-            if self.nDupAcks == self.dupAckThreshold:
-                # Fast retransmit
-                self.ssthresh = max(self.cwnd / 2, 2)
-                self.cwnd = self.ssthresh + 3
-                advanceAmount = len(toSend) * 3  # Fast retransmit, so advance by 3 segments
+        if self.state != State.OPEN:
+            raise RuntimeError("Trying to send data, but socket is not in OPEN state")
+    
+        toSend = self.outBuffer[:MTU]
+        pkt = Packet(seqNum=self.seqNum, connid=self.connid, payload=toSend)
+        self._send(pkt)
+    
+        startTime = time.time()
+        while len(self.outBuffer) > 0:
+            pkt = self._recv()
+            if pkt and pkt.isAck:
+                # Congestion control logic
+                if self.cwnd < self.ssthresh:
+                    self.cwnd *= 2  # Slow start
+                else:
+                    self.cwnd += 1  # Congestion avoidance
+    
+                advanceAmount = len(toSend)
                 self.nDupAcks = 0
+    
                 self.outBuffer = self.outBuffer[advanceAmount:]
                 self.base = self.seqNum  # Update base for the next sequence number
-
-        if time.time() - startTime > GLOBAL_TIMEOUT:
-            self.state = State.ERROR
-            raise RuntimeError("Timeout")
-
-    return len(data)
+    
+            elif pkt and pkt.isDupAck:
+                self.nDupAcks += 1
+                if self.nDupAcks == self.dupAckThreshold:
+                    # Fast retransmit
+                    self.ssthresh = max(self.cwnd / 2, 2)
+                    self.cwnd = self.ssthresh + 3
+                    advanceAmount = len(toSend) * 3  # Fast retransmit, so advance by 3 segments
+                    self.nDupAcks = 0
+                    self.outBuffer = self.outBuffer[advanceAmount:]
+                    self.base = self.seqNum  # Update base for the next sequence number
+    
+            if time.time() - startTime > GLOBAL_TIMEOUT:
+                self.state = State.ERROR
+                raise RuntimeError("Timeout")
+    
+        return len(data)
