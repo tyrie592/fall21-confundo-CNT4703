@@ -20,8 +20,8 @@ class State(Enum):
     CLOSED = 20
     ERROR = 21
 
-# class TimeoutError:
-#     pass
+class TimeoutError:
+     pass
 
 class Socket:
     '''Incomplete socket abstraction for Confundo protocol'''
@@ -142,8 +142,8 @@ class Socket:
 
         elif inPkt.isFin:
             if self.inSeq == inPkt.seqNum: # all previous packets has been received, so safe to advance
-                ### UPDATE CORRECTLY HERE
-                ### self.inSeq = ???
+                ### UPDATEd CORRECTLY HERE
+                self.inSeq +=1
                 self.finReceived = True
             else:
                 # don't advance, which means we will send a duplicate ACK
@@ -160,7 +160,7 @@ class Socket:
 
             if self.inSeq == inPkt.seqNum: # all previous packets has been received, so safe to advance
                 ### UPDATE CORRECTLY HERE
-                ### self.inSeq = ???
+                self.inSeq +=1
                 self.inBuffer += inPkt.payload
             else:
                 # don't advance, which means we will send a duplicate ACK
@@ -214,7 +214,7 @@ class Socket:
     def sendFinPacket(self):
         synPkt = Packet(seqNum=self.seqNum, connId=self.connId, isFin=True)
         ### UPDATE CORRECTLY HERE
-        ### self.seqNum = ???
+        self.inSeq +=1
         self._send(synPkt)
 
     def expectFinAck(self):
