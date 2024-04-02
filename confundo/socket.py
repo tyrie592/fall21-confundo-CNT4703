@@ -20,8 +20,8 @@ class State(Enum):
     CLOSED = 20
     ERROR = 21
 
-class TimeoutError:
-     pass
+# class TimeoutError:
+#     pass
 
 class Socket:
     '''Incomplete socket abstraction for Confundo protocol'''
@@ -49,10 +49,6 @@ class Socket:
 
         self.remote = None
         self.noClose = noClose
-
-        self.cwnd = 1  # congestion window starting size
-        self.ssthresh = 64  # Initial slow start threshold
-        self.dupAckThreshold = 3  # Duplicate ACKs fast retransmit threshold
 
     def __enter__(self):
         return self
@@ -142,8 +138,8 @@ class Socket:
 
         elif inPkt.isFin:
             if self.inSeq == inPkt.seqNum: # all previous packets has been received, so safe to advance
-                ### UPDATEd CORRECTLY HERE
-                self.inSeq +=1
+                ### UPDATE CORRECTLY HERE
+                ### self.inSeq = ???
                 self.finReceived = True
             else:
                 # don't advance, which means we will send a duplicate ACK
@@ -160,7 +156,7 @@ class Socket:
 
             if self.inSeq == inPkt.seqNum: # all previous packets has been received, so safe to advance
                 ### UPDATE CORRECTLY HERE
-                self.inSeq +=1
+                ### self.inSeq = ???
                 self.inBuffer += inPkt.payload
             else:
                 # don't advance, which means we will send a duplicate ACK
@@ -195,8 +191,9 @@ class Socket:
 
     def sendSynPacket(self):
         synPkt = Packet(seqNum=self.seqNum, connId=self.connId, isSyn=True)
-        self.__send(synPkt) 
-        self.seqNum += 1 
+        ### UPDATE CORRECTLY HERE
+        ### self.seqNum = ???
+        self._send(synPkt)
 
     def expectSynAck(self):
         ### MAY NEED FIXES IN THIS METHOD
@@ -214,7 +211,7 @@ class Socket:
     def sendFinPacket(self):
         synPkt = Packet(seqNum=self.seqNum, connId=self.connId, isFin=True)
         ### UPDATE CORRECTLY HERE
-        self.inSeq +=1
+        ### self.seqNum = ???
         self._send(synPkt)
 
     def expectFinAck(self):
@@ -247,42 +244,43 @@ class Socket:
             return response
 
     def send(self, data):
+        '''
+        This is one of the methods that require fixes.  Besides the marked place where you need
+        to figure out proper updates (to make basic transfer work), this method is the place
+        where you should initate congestion control operations.   You can either directly update cwnd, ssthresh,
+        and anything else you need or use CwndControl class, up to you.  There isn't any skeleton code for the
+        congestion control operations.  You would need to update things here and in `format_msg` calls
+        in this file to properly print values.
+        '''
+
         if self.state != State.OPEN:
-            raise RuntimeError("Trying to send data, but socket is not in OPEN state")
-    
-        toSend = self.outBuffer[:MTU]
-        pkt = Packet(seqNum=self.seqNum, connid=self.connid, payload=toSend)
-        self._send(pkt)
-    
+            raise RuntimeError("Trying to send FIN, but socket is not in OPEN state")
+
+        self.outBuffer += data
+
         startTime = time.time()
         while len(self.outBuffer) > 0:
-            pkt = self._recv()
+            toSend = self.outBuffer[:MTU]
+            pkt = Packet(seqNum=self.base, connId=self.connId, payload=toSend)
+            ### UPDATE CORRECTLY HERE
+            ### self.seqNum = ???
+            self._send(pkt)
+
+            pkt = self._recv()  # if within RTO we didn't receive packets, things will be retransmitted
             if pkt and pkt.isAck:
-                # Congestion control logic
-                if self.cwnd < self.ssthresh:
-                    self.cwnd *= 2  # Slow start
+                ### UPDATE CORRECTLY HERE
+                # advanceAmount = ???
+                if advanceAmount == 0:
+                    self.nDupAcks += 1
                 else:
-                    self.cwnd += 1  # Congestion avoidance
-    
-                advanceAmount = len(toSend)
-                self.nDupAcks = 0
-    
-                self.outBuffer = self.outBuffer[advanceAmount:]
-                self.base = self.seqNum  # Update base for the next sequence number
-    
-            elif pkt and pkt.isDupAck:
-                self.nDupAcks += 1
-                if self.nDupAcks == self.dupAckThreshold:
-                    # Fast retransmit
-                    self.ssthresh = max(self.cwnd / 2, 2)
-                    self.cwnd = self.ssthresh + 3
-                    advanceAmount = len(toSend) * 3  # Fast retransmit, so advance by 3 segments
                     self.nDupAcks = 0
-                    self.outBuffer = self.outBuffer[advanceAmount:]
-                    self.base = self.seqNum  # Update base for the next sequence number
-    
+
+                self.outBuffer = self.outBuffer[advanceAmount:]
+                ### UPDATE CORRECTLY HERE
+                ### self.base = ???
+
             if time.time() - startTime > GLOBAL_TIMEOUT:
                 self.state = State.ERROR
-                raise RuntimeError("Timeout")
-    
+                raise RuntimeError("timeout")
+
         return len(data)
