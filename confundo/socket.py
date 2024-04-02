@@ -20,8 +20,8 @@ class State(Enum):
     CLOSED = 20
     ERROR = 21
 
-# class TimeoutError:
-#     pass
+class TimeoutError:
+    pass
 
 class Socket:
     '''Incomplete socket abstraction for Confundo protocol'''
